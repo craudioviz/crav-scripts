@@ -8,7 +8,7 @@ usage() {
 crav — helper for CRAV scripts
 
 Usage:
-  crav new <name>        Create scripts/<name>.sh with a starter template
+  crav new <name>        Create scripts/<name>.sh or known templates (python_app, node_app)
   crav run <name>        Run scripts/<name>.sh
   crav push <msg>        Commit all changes with <msg> and push to origin/main
   crav health            Write/commit a timestamped .healthcheck and push
@@ -16,8 +16,10 @@ Usage:
 
 Examples:
   crav new backup_db
-  crav run backup_db
-  crav push "feat: add backup_db script"
+  crav new python_app
+  crav new node_app
+  crav run python_app
+  crav push "feat: add python_app"
 USAGE
 }
 
@@ -26,29 +28,97 @@ ensure_repo() {
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "Not a git repo at $ROOT"; exit 1; }
 }
 
+# ---- TEMPLATES --------------------------------------------------------------
+
+mk_python_app_script() {
+  mkdir -p "$ROOT/scripts"
+  cat > "$ROOT/scripts/python_app.sh" <<'PYBASH'
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+APP="$ROOT/apps/python_app"
+mkdir -p "$APP"
+cd "$APP"
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+printf 'requests\n' > requirements.txt
+pip install -r requirements.txt
+cat > main.py <<'PY'
+import requests
+print("python_app OK")
+PY
+python main.py
+PYBASH
+  chmod +x "$ROOT/scripts/python_app.sh"
+}
+
+mk_node_app_script() {
+  mkdir -p "$ROOT/scripts"
+  cat > "$ROOT/scripts/node_app.sh" <<'NJBASH'
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+APP="$ROOT/apps/node_app"
+mkdir -p "$APP"
+cd "$APP"
+if [ ! -f package.json ]; then npm init -y >/dev/null 2>&1; fi
+npm pkg set type=module >/dev/null
+cat > index.js <<'JS'
+console.log("node_app OK");
+JS
+node index.js
+NJBASH
+  chmod +x "$ROOT/scripts/node_app.sh"
+}
+
+# ---- COMMANDS ---------------------------------------------------------------
+
 cmd_new() {
   ensure_repo
   local name="${1:-}"
   [[ -z "$name" ]] && { echo "Specify a name: crav new <name>"; exit 1; }
-  mkdir -p "$ROOT/scripts"
-  local f="$ROOT/scripts/${name}.sh"
-  if [[ -e "$f" ]]; then
-    echo "File exists: scripts/${name}.sh"
-  else
-    cat > "$f" <<'TEMPLATE'
+
+  case "$name" in
+    python_app)
+      if [[ ! -x "$ROOT/scripts/python_app.sh" ]]; then
+        mk_python_app_script
+        git add "$ROOT/scripts/python_app.sh"
+        git commit -m "feat: add python_app template" || true
+      else
+        echo "scripts/python_app.sh already exists."
+      fi
+      ;;
+
+    node_app)
+      if [[ ! -x "$ROOT/scripts/node_app.sh" ]]; then
+        mk_node_app_script
+        git add "$ROOT/scripts/node_app.sh"
+        git commit -m "feat: add node_app template" || true
+      else
+        echo "scripts/node_app.sh already exists."
+      fi
+      ;;
+
+    *)
+      mkdir -p "$ROOT/scripts"
+      local f="$ROOT/scripts/${name}.sh"
+      if [[ -e "$f" ]]; then
+        echo "File exists: scripts/${name}.sh"
+      else
+        cat > "$f" <<'GEN'
 #!/usr/bin/env bash
 set -euo pipefail
-
-# === Describe what this script does ===
 echo "Running: ${0##*/}"
-
 # TODO: your commands here
-# echo "Hello from <your-script>"
-
-TEMPLATE
-    chmod +x "$f"
-    echo "Created scripts/${name}.sh"
-  fi
+GEN
+        chmod +x "$f"
+        echo "Created scripts/${name}.sh"
+        git add "$f"
+        git commit -m "feat: add ${name}.sh" || true
+      fi
+      ;;
+  esac
 }
 
 cmd_run() {
