@@ -10,16 +10,16 @@ crav — helper for CRAV scripts
 Usage:
   crav new <name>        Create scripts/<name>.sh or known templates (python_app, node_app)
   crav run <name>        Run scripts/<name>.sh
+  crav list              List available scripts
+  crav rm <name>         Safely move scripts/<name>.sh to scripts/.trash/
   crav push "<msg>"      Commit all changes with <msg> and push to origin/main
   crav health            Write/commit a timestamped .healthcheck and push
   crav sync              git pull --rebase; show status
 
 Examples:
   crav new backup_db
-  crav new python_app
-  crav new node_app
-  crav run python_app
-  crav push "feat: add python_app"
+  crav new python_app && crav run python_app
+  crav new node_app   && crav run node_app
 USAGE
 }
 
@@ -112,6 +112,28 @@ cmd_run() {
   "$f"
 }
 
+cmd_list() {
+  ensure_repo
+  echo "Available scripts:"
+  find "$ROOT/scripts" -maxdepth 1 -type f -name '*.sh' -printf '  - %f\n' 2>/dev/null | sort
+}
+
+cmd_rm() {
+  ensure_repo
+  local name="${1:-}"
+  [ -z "$name" ] && { echo "Specify a name: crav rm <name>"; exit 1; }
+  local f="$ROOT/scripts/${name}.sh"
+  [ -e "$f" ] || { echo "Not found: scripts/${name}.sh"; exit 1; }
+  mkdir -p "$ROOT/scripts/.trash"
+  local ts; ts="$(date +%Y%m%d-%H%M%S)"
+  local dest="$ROOT/scripts/.trash/${ts}-${name}.sh"
+  mv "$f" "$dest"
+  git add -A
+  git commit -m "chore: trash scripts/${name}.sh -> scripts/.trash/${ts}-${name}.sh" || true
+  git push -u origin main
+  echo "Moved to trash: scripts/.trash/${ts}-${name}.sh"
+}
+
 cmd_push() {
   ensure_repo
   local msg="${1:-}"
@@ -140,6 +162,8 @@ cmd_sync() {
 case "${1:-}" in
   new)    shift; cmd_new "$@";;
   run)    shift; cmd_run "$@";;
+  list)   shift; cmd_list;;
+  rm)     shift; cmd_rm "$@";;
   push)   shift; cmd_push "$@";;
   health) shift; cmd_health;;
   sync)   shift; cmd_sync;;
