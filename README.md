@@ -1,3 +1,5 @@
+[![Built with CRAV Helper](https://img.shields.io/badge/Built%20with-CRAV%20Helper-blue)](#crav-helper)
+
 # CRAV scripts
 
 ---
