@@ -89,7 +89,6 @@ cmd_new() {
         echo "scripts/python_app.sh already exists."
       fi
       ;;
-
     node_app)
       if [[ ! -x "$ROOT/scripts/node_app.sh" ]]; then
         mk_node_app_script
@@ -99,7 +98,6 @@ cmd_new() {
         echo "scripts/node_app.sh already exists."
       fi
       ;;
-
     *)
       mkdir -p "$ROOT/scripts"
       local f="$ROOT/scripts/${name}.sh"
